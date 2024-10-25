@@ -4,10 +4,16 @@ const { v4: uuidv4 } = require("uuid");
 const slugify = require('slugify'); 
 const { Op } = require('sequelize');
 const { successResponse } = require('../utils/response');
+const path = require("path");
 
 exports.createBlog = async (req, res) => {
     try {
-        const {  title, content, image } = req.body;
+        const {  title, content } = req.body;
+        let image 
+        if(req.file){
+        image = req.file.filename
+        }
+        console.log("image----" , image)
         // const user_id = req.userId
         const user_id = 1
         console.log("user_id====", user_id)
@@ -43,17 +49,24 @@ exports.createBlog = async (req, res) => {
     }
 };
 
+
+
+
 exports.viewBlogById = async (req, res) => {
     try {
         const { blog_id } = req.params;
-        console.log("---" , req.params)
+
+        // Validate the blog_id
+        if (!blog_id) {
+            return res.status(400).json({ message: "Blog ID is required" });
+        }
 
         // Fetch the blog by ID
         const blog = await Blog.findOne({
-            where: { blog_id:  blog_id }, 
+            where: { blog_id },
             include: {
-                model: User, // Include the User model if you want to get user details
-                attributes: ['id', 'name', 'email'], // Adjust attributes as needed
+                model: User,
+                attributes: ['id', 'name', 'email'],
             },
         });
 
@@ -62,18 +75,37 @@ exports.viewBlogById = async (req, res) => {
             return res.status(404).json({ message: "Blog not found" });
         }
 
+        // Construct the image URL if it exists
+        if (blog.dataValues.image) {
+            const baseUrl = process.env.BASE_URL || 'http://192.168.8.237:5000';
+            // blog.dataValues.image = `${baseUrl}/blog-writing/blog_node/uploads/${blog.dataValues.image}`;
+            blog.dataValues.image = `${baseUrl}/${blog.dataValues.image}`;
+        }
         // Respond with the found blog
-        res.status(200).json(blog);
+        res.status(200).json({
+            id: blog.dataValues.blog_id,
+            title: blog.dataValues.title,
+            content: blog.dataValues.content,
+            image: blog.dataValues.image,
+            user: blog.User,
+        });
     } catch (error) {
         console.error("Error retrieving blog:", error);
         res.status(500).json({ message: "Error occurred", error: true });
-    }
+    }  
 };
+
+
 
 exports.updateBlogByuserIDandBlogId = async (req, res) => {
     try {
-        const { user_id, blog_id, title, content, image } = req.body;
-
+        const {  blog_id, title, content} = req.body;
+        let image 
+        if(req.file) {
+            image = req.file.filename
+        }
+        console.log("image----" , image)
+        user_id  = 1
         // Check if user_id and blog_id are provided
         if (!user_id || !blog_id) {
             return res.status(400).json({ message: "user_id and blog_id are required", error: true });
@@ -143,7 +175,9 @@ exports.deleteBlogByID = async (req, res) => {
 
 exports.viewBlogs = async (req, res) => {
     try {
-        const blogs = await Blog.findAll();
+        const blogs = await Blog.findAll({
+            order : [['createdAt', 'DESC']],
+       });
         console.log("blogs" , blogs)
         res.status(200).json(blogs);
     } catch (error) {
