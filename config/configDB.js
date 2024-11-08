@@ -1,14 +1,15 @@
 const { Sequelize } = require("sequelize");
 
-const dbName = "user_blog";
-const sequelize = new Sequelize(dbName, "postgres", "1234", {
+const dbName = process.env.DB_NAME || "user_blog";
+console.log("-------------------------------" ,dbName)
+const sequelize = new Sequelize( dbName , "postgres", "1234", {
     host: "localhost",
     dialect: "postgres",
 });
 
 // Function to create the database if it doesn't exist
 const createDatabaseIfNotExists = async () => {
-    const adminSequelize = new Sequelize("postgres", "postgres", "1234", {
+    const adminSequelize = new Sequelize(dbName, "postgres", "1234", {
         host: "localhost",
         dialect: "postgres",
         logging: false, // Disable logging for the admin connection

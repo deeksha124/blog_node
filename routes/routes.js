@@ -7,23 +7,45 @@ const authenticationMiddleware = require("../middleware/authMiddleware");
 const upload = require("../middleware/multerMiddleware");
 
 router.group("/user", (userRouter) => {
-    userRouter.post("/signup", userController.createUser);
-    userRouter.post("/login", userController.loginUser);
-    // userRouter.get("/dashboard" ,userController.dashboard)
+  userRouter.post("/signup", userController.createUser);
+  userRouter.post("/login", userController.loginUser);
+  userRouter.get("/homepage", userController.homePage);
+  userRouter.get(
+    "/dashboard",
+    authenticationMiddleware,
+    userController.dashboard
+  );
+  userRouter.get(
+    "/adminDashboard",
+    authenticationMiddleware,
+    userController.adminDashboard
+  );
 });
 
 router.group("/blog", (blogRouter) => {
-    // Authenticate routes
-    // blogRouter.use(authenticationMiddleware);
-    
-    blogRouter.post("/addblog",upload.single('image') ,blogController.createBlog);
-    blogRouter.get("/viewblog/:blog_id", blogController.viewBlogById); 
-    blogRouter.put("/edit" ,upload.single('image'),blogController.updateBlogByuserIDandBlogId);
-    blogRouter.delete("/delete/:blog_id" , blogController.deleteBlogByID)
-    blogRouter.get("/viewblogslist" , blogController.viewBlogs)
+  // Authenticate routes
+  // blogRouter.use(authenticationMiddleware);
+
+  blogRouter.post(
+    "/addblog",
+    authenticationMiddleware,
+    upload.single("image"),
+    blogController.createBlog
+  );
+  blogRouter.get("/viewblog/:blog_id", blogController.viewBlogById);
+  blogRouter.get("/viewblogslug/:slug", blogController.viewBlogBySlug);
+  blogRouter.put(
+    "/edit",
+    authenticationMiddleware,
+    upload.single("image"),
+    blogController.updateBlogByuserIDandBlogId
+  );
+  blogRouter.delete("/delete/:blog_id", blogController.deleteBlogByID);
+  blogRouter.get(
+    "/viewblogslist",
+    authenticationMiddleware,
+    blogController.viewBlogs
+  );
 });
-
-
-
 
 module.exports = router;
