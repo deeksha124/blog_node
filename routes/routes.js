@@ -46,6 +46,25 @@ router.group("/blog", (blogRouter) => {
     authenticationMiddleware,
     blogController.viewBlogs
   );
+  blogRouter.post("/comment", authenticationMiddleware, blogController.comment);
+  blogRouter.get(
+    "/allcomments",
+    authenticationMiddleware,
+    blogController.allComments
+  );
+  // blogRouter.get("/getlike", blogController.getLike);
+  blogRouter.post("/addlike", authenticationMiddleware, blogController.addLike);
+  blogRouter.post(
+    "/addfavorite",
+    authenticationMiddleware,
+    blogController.addFavorite
+  );
+
+  blogRouter.post(
+    "/addReply",
+    authenticationMiddleware,
+    blogController.addReply
+  );
 });
 
 module.exports = router;

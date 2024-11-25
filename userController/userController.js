@@ -2,6 +2,9 @@
 const bcrypt = require("bcrypt");
 const User = require("../model/userModel");
 const Blog = require("../model/blogModel");
+const Comment = require("../model/commentModel");
+const Like = require("../model/likeModel");
+const { sequelize } = require("../config/configDB");
 const jwt = require("jsonwebtoken");
 const { user } = require("pg/lib/defaults");
 const { successResponse, errorResponse } = require("../utils/response");
@@ -13,7 +16,6 @@ exports.createUser = async (req, res) => {
     // Check for existing user by email
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      // return res.status(400).json({ message: "Email already exists" });
       return errorResponse(res, "Email already exists", 400);
     }
 
@@ -28,8 +30,7 @@ exports.createUser = async (req, res) => {
       password: hashedPassword,
     });
 
-    console.log("newUser", newUser);
-    let data = {
+    const data = {
       id: newUser.id,
       name: newUser.name,
       email: newUser.email,
@@ -38,7 +39,7 @@ exports.createUser = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: data.id, email: existingUser.email }, // Payload
+      { id: data.id, email: data.email }, // Payload
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
@@ -47,13 +48,14 @@ exports.createUser = async (req, res) => {
       code: 0,
       error: false,
       message: "You are signed up successfully",
+      data, // Including user data in the response
       token,
     };
 
     return res.status(200).json(response);
   } catch (error) {
-    console.log(error);
-    return errorResponse(res, "Error occurred", 500);
+    console.error("Error in createUser:", error); // Include a helpful error log
+    return errorResponse(res, "An error occurred while creating the user", 500);
   }
 };
 
@@ -221,27 +223,117 @@ exports.adminDashboard = async (req, res) => {
   }
 };
 
+// exports.homePage = async (req, res) => {
+//   try {
+//     const userCount = await User.count();
+
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = parseInt(req.query.limit, 10) || 10;
+//     const offset = (page - 1) * limit;
+
+//     const { count, rows: blogs } = await Blog.findAndCountAll({
+//       limit,
+//       offset,
+//       order: [["createdAt", "DESC"]],
+//       include: [
+//         {
+//           model: Comment,
+//           as: "comments",
+//           attributes: ["comment_id", "username", "comment", "createdAt"],
+//           order: [["createdAt", "DESC"]],
+//         },
+//       ],
+//       attributes: {
+//         include: [
+//           [
+//             sequelize.literal(`(
+//               SELECT COUNT(*)
+//               FROM "Likes" AS "likes"
+//               WHERE "likes"."blog_id" = "Blog"."blog_id"
+//             )`),
+//             "likeCount",
+//           ],
+//         ],
+//       },
+//       group: ["Blog.blog_id"], // Only group by Blog ID here
+//     });
+
+//     const totalPages = Math.ceil(count / limit);
+
+//     if (blogs && blogs.length > 0) {
+//       const baseUrl = process.env.BASE_URL || "http://192.168.8.237:5000";
+//       blogs.forEach((blog) => {
+//         if (blog.image) {
+//           blog.image = `${baseUrl}/${blog.image}`;
+//         }
+//       });
+//     }
+
+//     const data = { userCount, blogs, totalPages, currentPage: page };
+
+//     return successResponse(
+//       res,
+//       "Home page data fetched successfully",
+//       200,
+//       data
+//     );
+//   } catch (error) {
+//     console.error(error);
+//     return errorResponse(
+//       res,
+//       "Error occurred while fetching home page data",
+//       500
+//     );
+//   }
+// };
+
 exports.homePage = async (req, res) => {
   try {
-    // Fetch the count of users
     const userCount = await User.count();
 
-    const page = parseInt(req.query.page, 10) || 1; // Default to page 1
-    const limit = parseInt(req.query.limit, 10) || 10; // Default to 10 items per page
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
-    console.log("limit-->", limit, "offset-->", offset);
 
-    // Fetch blogs with pagination
     const { count, rows: blogs } = await Blog.findAndCountAll({
-      limit, // Limit the number of results
-      offset, // Skip the number of records based on current page
-      order: [["createdAt", "DESC"]], // Order by most recent blogs
+      limit,
+      offset,
+      order: [["createdAt", "DESC"]],
+      include: [
+        {
+          model: Comment,
+          as: "comments",
+          attributes: ["comment_id", "username", "comment", "createdAt"],
+          where: { parent_id: null }, // Fetch only top-level comments
+          required: false, // Include even if no comments exist
+          order: [["createdAt", "DESC"]],
+          include: [
+            {
+              model: Comment,
+              as: "replies", // Nested replies
+              attributes: ["comment_id", "username", "comment", "createdAt"],
+              order: [["createdAt", "ASC"]],
+            },
+          ],
+        },
+      ],
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM "Likes" AS "likes"
+              WHERE "likes"."blog_id" = "Blog"."blog_id"
+            )`),
+            "likeCount",
+          ],
+        ],
+      },
+      distinct: true, // Ensure accurate `count` for pagination
     });
 
-    // Calculate the total number of pages
     const totalPages = Math.ceil(count / limit);
 
-    // Modify image URL for each blog if the image exists
     if (blogs && blogs.length > 0) {
       const baseUrl = process.env.BASE_URL || "http://192.168.8.237:5000";
       blogs.forEach((blog) => {
@@ -251,10 +343,8 @@ exports.homePage = async (req, res) => {
       });
     }
 
-    // Prepare data object
     const data = { userCount, blogs, totalPages, currentPage: page };
 
-    // Send success response
     return successResponse(
       res,
       "Home page data fetched successfully",
@@ -263,8 +353,6 @@ exports.homePage = async (req, res) => {
     );
   } catch (error) {
     console.error(error);
-
-    // Send error response in case of failure
     return errorResponse(
       res,
       "Error occurred while fetching home page data",

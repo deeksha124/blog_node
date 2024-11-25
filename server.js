@@ -14,6 +14,8 @@ dotenv.config();
 // Import models and associations
 const User = require("./model/userModel");
 const Blog = require("./model/blogModel");
+const Like = require("./model/likeModel");
+const Favorite = require("./model/favoriteModel");
 require("./model/associations"); // Import associations after models are defined
 
 // Whitelist IPs

@@ -1,9 +1,12 @@
 const Blog = require("../model/blogModel");
 const User = require("../model/userModel");
+const Comment = require("../model/commentModel");
+const Like = require("../model/likeModel");
+const Favorite = require("../model/favoriteModel");
 const { v4: uuidv4 } = require("uuid");
 const slugify = require("slugify");
 const { Op } = require("sequelize");
-const { successResponse } = require("../utils/response");
+const { successResponse, errorResponse } = require("../utils/response");
 const path = require("path");
 
 exports.createBlog = async (req, res) => {
@@ -226,7 +229,6 @@ exports.viewBlogs = async (req, res) => {
       order: [["createdAt", "DESC"]], // Order by creation date in descending order
     });
 
-    console.log("blogs", blogs);
     res.status(200).json(blogs);
   } catch (error) {
     console.error(error);
@@ -237,7 +239,6 @@ exports.viewBlogs = async (req, res) => {
 exports.viewBlogBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    console.log("slug-----", slug);
 
     // Validate the blog_id
     if (!slug) {
@@ -253,7 +254,6 @@ exports.viewBlogBySlug = async (req, res) => {
       },
     });
 
-    console.log("blog-----------", blog);
     // Check if the blog was found
     if (!blog) {
       return res.status(404).json({ message: "Blog not found" });
@@ -276,5 +276,140 @@ exports.viewBlogBySlug = async (req, res) => {
   } catch (error) {
     console.error("Error retrieving blog:", error);
     res.status(500).json({ message: "Error occurred", error: true });
+  }
+};
+exports.comment = async (req, res) => {
+  try {
+    const { comment, blog_id } = req.body;
+    const user_id = req.userId; // Assuming req.userId contains the authenticated user's ID
+
+    // Check if the blog exists
+    const blog = await Blog.findOne({ where: { blog_id: blog_id } }); // Assuming the blog ID is 'id'
+    if (!blog) {
+      return errorResponse(res, "Blog not found", 404);
+    }
+
+    // Check if the user exists
+    const user = await User.findOne({ where: { id: user_id } }); // Assuming the user ID is 'id'
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    // Get the user's name
+    const username = user.name;
+
+    // Create a new comment
+    const newComment = await Comment.create({
+      user_id,
+      blog_id,
+      username, // Store the username for the comment
+      comment, // Store the actual comment content
+    });
+
+    // Send a success response with the new comment data
+    return successResponse(res, "Comment added successfully", 201, newComment);
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, "Failed to add comment", 500);
+  }
+};
+
+exports.allComments = async (req, res) => {
+  try {
+    const user_id = req.userId;
+  } catch (error) {
+    return errorResponse(res, "failed to  get Comments", 500);
+  }
+};
+
+exports.addLike = async (req, res) => {
+  try {
+    const { blog_id } = req.body;
+    const user_id = req.userId;
+
+    // Check if a Like already exists for this blog_id and user_id
+    const existingLike = await Like.findOne({
+      where: { blog_id: blog_id, user_id: user_id },
+    });
+
+    if (existingLike) {
+      // If the Like exists, delete it (toggle off)
+      await existingLike.destroy();
+      const count = await Like.count({ where: { blog_id } });
+
+      return res.status(200).json({
+        message: "Like removed successfully",
+        currentLikeCount: count,
+      });
+    } else {
+      // If the Like does not exist, create it (toggle on)
+      await Like.create({ blog_id: blog_id, user_id: user_id });
+      const count = await Like.count({ where: { blog_id } });
+      console.log("count-----", count);
+      return res
+        .status(200)
+        .json({ message: "Like added successfully", currentLikeCount: count });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Failed to toggle like" });
+  }
+};
+
+exports.addFavorite = async (req, res) => {
+  try {
+    const { blog_id } = req.body;
+    const user_id = req.userId;
+
+    // Check if a favorite already exists for this blog_id and user_id
+    const existingLike = await Favorite.findOne({
+      where: { blog_id: blog_id, user_id: user_id },
+    });
+
+    if (existingLike) {
+      // If the favorite exists, delete it (toggle off)
+      await existingLike.destroy();
+      return res.status(200).json({ message: "favorite removed successfully" });
+    } else {
+      // If the favorite does not exist, create it (toggle on)
+      await Favorite.create({ blog_id: blog_id, user_id: user_id });
+      return res.status(200).json({ message: "favorite added successfully" });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Failed to toggle favorite" });
+  }
+};
+
+exports.addReply = async (req, res) => {
+  try {
+    const { comment, blog_id, parent_id } = req.body;
+    const user_id = req.userId; // Assuming req.userId contains the authenticated user's ID
+    // Check if the user exists
+    const user = await User.findOne({ where: { id: user_id } }); // Assuming the user ID is 'id'
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    // Get the user's name
+    const username = user.name;
+
+    const newComment = await Comment.create({
+      comment_id: uuidv4(),
+      user_id,
+      username,
+      comment,
+      blog_id,
+      parent_id,
+    });
+
+    return res.status(201).json(newComment);
+  } catch (error) {
+    console.error("Error adding reply:", error);
+    res.status(500).json({
+      code: 1,
+      error: true,
+      message: "Failed to add reply",
+    });
   }
 };

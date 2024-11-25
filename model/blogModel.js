@@ -1,21 +1,21 @@
 const { DataTypes } = require("sequelize");
-const { sequelize } = require("../config/configDB"); 
+const { sequelize } = require("../config/configDB");
 
 // Define the Blog model
 const Blog = sequelize.define(
   "Blog",
   {
     blog_id: {
-      type: DataTypes.STRING, 
+      type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false, 
+      allowNull: false,
     },
     user_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'Users', // Ensure this matches the actual table name
-        key: 'id', // Assuming 'id' is the primary key in the Users table
+        model: "Users", // Ensure this matches the actual table name
+        key: "id", // Assuming 'id' is the primary key in the Users table
       },
     },
     title: {
@@ -25,10 +25,10 @@ const Blog = sequelize.define(
     slug: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true, 
+      unique: true,
     },
     content: {
-      type: DataTypes.TEXT, 
+      type: DataTypes.TEXT,
       allowNull: false,
     },
     image: {
